@@ -136,7 +136,7 @@ export default function TokenDetails({ getMetaData,  updateCreate }: {
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 max-w-3xl mx-auto py-10">
-                <h1 className="mb-4 text-4xl font-extrabold leading-none tracking-tight text-gray-900 md:text-5xl lg:text-6xl dark:text-white text-center mt-4">LaunchT - Lauch Your Own Token</h1>
+                <h1 className="mb-4 text-4xl font-extrabold leading-none tracking-tight text-gray-900 md:text-5xl lg:text-6xl dark:text-white text-center mt-4">LaunchT - Launch Your Own Token</h1>
                 <WalletMultiButton/>
                 <WalletDisconnectButton/>
                 <FormField
