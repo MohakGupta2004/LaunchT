@@ -107,9 +107,8 @@ export default function TokenDetails({ getMetaData,  updateCreate }: {
             setUploading(true);
             const imgUrl = await uploadFile();
             setUploading(false);
-            
-            if(url)
-                values.uri = imgUrl;
+            console.log("Image URL:", url);
+            values.uri = imgUrl;
 
             // Set creating state
             setCreating(true);

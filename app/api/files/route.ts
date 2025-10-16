@@ -26,6 +26,8 @@ export async function POST(request: NextRequest) {
     const fileUrl = new File([blob], "metadata.json", { type: "application/json" });
     const { cid } = await pinata.upload.public.file(fileUrl)
     const url = await pinata.gateways.public.convert(cid);
+
+    console.log("Metadata URL:", url);
     return NextResponse.json(url, { status: 200 });
   } catch (e) {
     console.log(e);
