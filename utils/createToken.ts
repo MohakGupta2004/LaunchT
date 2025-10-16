@@ -43,7 +43,8 @@ export const createToken = async (metadata: Metadata, connection: Connection, us
         tokenOwner: umi.identity.publicKey,
         tokenStandard: TokenStandard.Fungible,
       })
-    ).sendAndConfirm(umi);
-
-  return mint.publicKey;
+    ).sendAndConfirm(umi).then(()=>{
+        return mint.publicKey;
+    })
+    return "";
 }
