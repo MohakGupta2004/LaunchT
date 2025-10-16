@@ -15,36 +15,41 @@ export const createToken = async (metadata: Metadata, connection: Connection, us
   const mint = generateSigner(umi);
 
   console.log("Creating token with metadata:", metadata);
-  const builder = transactionBuilder()
-    .add(
-      createV1(umi, {
-        mint,
-        authority: umi.identity,
-        payer: umi.identity,
-        updateAuthority: umi.identity,
-        name: metadata.name,
-        symbol: metadata.symbol,
-        uri: metadata.uri,
-        sellerFeeBasisPoints: percentAmount(5.5),
-        tokenStandard: TokenStandard.Fungible,
-      })
-    )
-    .add(
-      createAssociatedToken(umi, {
-        mint: mint.publicKey,
-        owner: umi.identity.publicKey,
-      })
-    )
-    .add(
-      mintV1(umi, {
-        mint: mint.publicKey,
-        authority: umi.identity,
-        amount: BigInt(1_000_000 * 1e9), // 1,000,000 tokens with 9 decimals
-        tokenOwner: umi.identity.publicKey,
-        tokenStandard: TokenStandard.Fungible,
-      })
-    ).sendAndConfirm(umi).then(()=>{
-        return mint.publicKey;
-    })
-    return "";
-}
+  try {
+    await transactionBuilder()
+      .add(
+        createV1(umi, {
+          mint,
+          authority: umi.identity,
+          payer: umi.identity,
+          updateAuthority: umi.identity,
+          name: metadata.name,
+          symbol: metadata.symbol,
+          uri: metadata.uri,
+          sellerFeeBasisPoints: percentAmount(5.5),
+          tokenStandard: TokenStandard.Fungible,
+        })
+      )
+      .add(
+        createAssociatedToken(umi, {
+          mint: mint.publicKey,
+          owner: umi.identity.publicKey,
+        })
+      )
+      .add(
+        mintV1(umi, {
+          mint: mint.publicKey,
+          authority: umi.identity,
+          amount: BigInt(1_000_000 * 1e9), // 1,000,000 tokens with 9 decimals
+          tokenOwner: umi.identity.publicKey,
+          tokenStandard: TokenStandard.Fungible,
+        })
+      )
+      .sendAndConfirm(umi);
+
+    return mint.publicKey;
+  } catch (error) {
+    console.error("Transaction failed:", error);
+    throw new Error("Failed to create token");
+  }
+};
