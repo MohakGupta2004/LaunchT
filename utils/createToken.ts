@@ -4,7 +4,7 @@ import { createUmi } from '@metaplex-foundation/umi-bundle-defaults'
 import { walletAdapterIdentity } from '@metaplex-foundation/umi-signer-wallet-adapters'
 import { generateSigner, percentAmount, transactionBuilder } from '@metaplex-foundation/umi';
 import { createV1, mintV1, mplTokenMetadata, TokenStandard } from '@metaplex-foundation/mpl-token-metadata'
-import { createAssociatedToken, mintTokensTo, mplToolbox } from '@metaplex-foundation/mpl-toolbox';
+import { createAssociatedToken, mplToolbox } from '@metaplex-foundation/mpl-toolbox';
 type Metadata = {
   name: string,
   symbol: string,
