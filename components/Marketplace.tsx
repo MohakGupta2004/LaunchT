@@ -1,9 +1,16 @@
 'use client'
-import { useProjects } from '@/hooks/useLaunchpad'
+import { useMemo } from 'react'
+import { useProjects, useMarkets } from '@/hooks/useLaunchpad'
 import ProjectCard from './ProjectCard'
 
 export default function Marketplace() {
   const { projects, loading, error, refetch } = useProjects()
+  const { markets } = useMarkets()
+
+  const marketMap = useMemo(
+    () => new Map(markets.map((m) => [m.tokenMint.toBase58(), m])),
+    [markets]
+  )
 
   return (
     <div>
@@ -65,6 +72,7 @@ export default function Marketplace() {
             <ProjectCard
               key={project.publicKey.toBase58()}
               project={project}
+              market={marketMap.get(project.tokenMint.toBase58())}
               onInvested={refetch}
             />
           ))}

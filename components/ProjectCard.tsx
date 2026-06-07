@@ -2,8 +2,9 @@
 import { useState } from 'react'
 import { LAMPORTS_PER_SOL } from '@solana/web3.js'
 import type { BN } from '@anchor-lang/core'
-import type { ProjectAccount } from '@/hooks/useLaunchpad'
+import type { ProjectAccount, MarketAccount } from '@/hooks/useLaunchpad'
 import TradeModal from './TradeModal'
+import TokenAnalyticsModal from './TokenAnalyticsModal'
 
 function solFmt(bn: BN) {
   return (bn.toNumber() / LAMPORTS_PER_SOL).toFixed(2)
@@ -11,13 +12,16 @@ function solFmt(bn: BN) {
 
 export default function ProjectCard({
   project,
+  market,
   onInvested,
 }: {
   project: ProjectAccount
+  market?: MarketAccount
   onInvested?: () => void
 }) {
   const [showTrade, setShowTrade] = useState(false)
   const [tradeTab, setTradeTab] = useState<'buy' | 'sell'>('buy')
+  const [showAnalytics, setShowAnalytics] = useState(false)
   const [imageFailed, setImageFailed] = useState(false)
   const showImage = project.imageUrl && !imageFailed
 
@@ -107,6 +111,17 @@ export default function ProjectCard({
             >
               Sell
             </button>
+            {market && (
+              <button
+                onClick={() => setShowAnalytics(true)}
+                title="View analytics"
+                className="rounded-lg border border-zinc-700 px-2.5 py-2 text-zinc-400 hover:text-white hover:border-zinc-600 transition-colors"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                  <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -121,6 +136,14 @@ export default function ProjectCard({
           onInvested?.()
         }}
       />
+      {market && (
+        <TokenAnalyticsModal
+          project={project}
+          market={market}
+          isOpen={showAnalytics}
+          onClose={() => setShowAnalytics(false)}
+        />
+      )}
     </>
   )
 }
