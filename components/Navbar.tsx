@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import CreateTokenModal from './CreateTokenModal'
 
-type AppView = 'marketplace' | 'investments'
+export type AppView = 'marketplace' | 'trade'
 
 export default function Navbar({
   view,
@@ -21,26 +21,24 @@ export default function Navbar({
           <span className="text-lg font-bold text-white tracking-tight">LaunchT</span>
 
           <nav className="flex items-center gap-1 rounded-lg bg-zinc-900 p-1">
-            <button
-              onClick={() => setView('marketplace')}
-              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-                view === 'marketplace'
-                  ? 'bg-zinc-700 text-white shadow'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              Marketplace
-            </button>
-            <button
-              onClick={() => setView('investments')}
-              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-                view === 'investments'
-                  ? 'bg-zinc-700 text-white shadow'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              My Investments
-            </button>
+            {(
+              [
+                { id: 'marketplace', label: 'Marketplace' },
+                { id: 'trade', label: 'Trade' },
+              ] as { id: AppView; label: string }[]
+            ).map(({ id, label }) => (
+              <button
+                key={id}
+                onClick={() => setView(id)}
+                className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                  view === id
+                    ? 'bg-zinc-700 text-white shadow'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </nav>
 
           <div className="flex items-center gap-3">

@@ -38,4 +38,8 @@ pub enum LaunchpadError {
     ZeroInvestment,
     #[msg("Owner token account has insufficient balance")]
     InsufficientOwnerBalance,
+    #[msg("Transaction price moved past slippage tolerance")]
+    SlippageExceeded,
+    #[msg("Seller token account has insufficient balance")]
+    InsufficientSellerBalance,
 }

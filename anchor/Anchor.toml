@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-launchpad = "DYRJEMtEpkyrd4cpvjbGzf9Pg4CJ89JTm6id14PVmnWu"
+launchpad = "GBNYMJGjXwNBhhjarQ3sMiurya1yvQfeZfki1n1jASva"
 
 [provider]
 cluster = "localnet"

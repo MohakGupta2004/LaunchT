@@ -1,5 +1,5 @@
 {
-  "address": "DYRJEMtEpkyrd4cpvjbGzf9Pg4CJ89JTm6id14PVmnWu",
+  "address": "GBNYMJGjXwNBhhjarQ3sMiurya1yvQfeZfki1n1jASva",
   "metadata": {
     "name": "launchpad",
     "version": "0.1.0",
@@ -8,28 +8,105 @@
   },
   "instructions": [
     {
-      "name": "claim_tokens",
-      "discriminator": [108, 216, 210, 231, 0, 212, 42, 64],
+      "name": "buy",
+      "docs": [
+        "Buy tokens at current bonding curve price.",
+        "max_cost: slippage guard — tx fails if cost exceeds this."
+      ],
+      "discriminator": [
+        102,
+        6,
+        61,
+        18,
+        1,
+        218,
+        235,
+        234
+      ],
       "accounts": [
-        { "name": "investor", "writable": true, "signer": true },
-        { "name": "token_mint" },
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_mint",
+          "relations": [
+            "project"
+          ]
+        },
         {
           "name": "project",
           "pda": {
             "seeds": [
-              { "kind": "const", "value": [112, 114, 111, 106, 101, 99, 116] },
-              { "kind": "account", "path": "token_mint" }
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
             ]
           }
         },
         {
-          "name": "investment",
+          "name": "creator",
+          "writable": true
+        },
+        {
+          "name": "market",
           "writable": true,
           "pda": {
             "seeds": [
-              { "kind": "const", "value": [105, 110, 118, 101, 115, 116, 109, 101, 110, 116] },
-              { "kind": "account", "path": "project" },
-              { "kind": "account", "path": "investor" }
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
             ]
           }
         },
@@ -38,84 +115,707 @@
           "writable": true,
           "pda": {
             "seeds": [
-              { "kind": "const", "value": [118, 97, 117, 108, 116] },
-              { "kind": "account", "path": "project" }
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              }
             ]
           }
         },
-        { "name": "investor_ata", "writable": true },
-        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
-        { "name": "associated_token_program", "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" },
-        { "name": "system_program", "address": "11111111111111111111111111111111" }
+        {
+          "name": "buyer_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "buyer"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "token_amount",
+          "type": "u64"
+        },
+        {
+          "name": "max_cost",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "claim_tokens",
+      "docs": [
+        "Investor claims all unclaimed allocated tokens to their ATA."
+      ],
+      "discriminator": [
+        108,
+        216,
+        210,
+        231,
+        0,
+        212,
+        42,
+        64
+      ],
+      "accounts": [
+        {
+          "name": "investor",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "investment"
+          ]
+        },
+        {
+          "name": "token_mint",
+          "relations": [
+            "project"
+          ]
+        },
+        {
+          "name": "project",
+          "docs": [
+            "Project PDA is vault authority; its seeds sign the token transfer."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          },
+          "relations": [
+            "investment"
+          ]
+        },
+        {
+          "name": "investment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  118,
+                  101,
+                  115,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              },
+              {
+                "kind": "account",
+                "path": "investor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              }
+            ]
+          }
+        },
+        {
+          "name": "investor_ata",
+          "docs": [
+            "Investor's ATA; created if it doesn't exist."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "investor"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
       ],
       "args": []
     },
     {
       "name": "create_project",
-      "discriminator": [148, 219, 181, 42, 221, 114, 145, 190],
+      "docs": [
+        "Register a token mint as an investable project."
+      ],
+      "discriminator": [
+        148,
+        219,
+        181,
+        42,
+        221,
+        114,
+        145,
+        190
+      ],
       "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
-        { "name": "token_mint" },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_mint",
+          "docs": [
+            "deposit_tokens runs."
+          ]
+        },
         {
           "name": "project",
           "writable": true,
           "pda": {
             "seeds": [
-              { "kind": "const", "value": [112, 114, 111, 106, 101, 99, 116] },
-              { "kind": "account", "path": "token_mint" }
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
             ]
           }
         },
-        { "name": "system_program", "address": "11111111111111111111111111111111" }
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
       ],
       "args": [
-        { "name": "params", "type": { "defined": { "name": "CreateProjectParams" } } }
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "CreateProjectParams"
+            }
+          }
+        }
       ]
     },
     {
       "name": "deposit_tokens",
-      "discriminator": [176, 83, 229, 18, 191, 143, 176, 150],
+      "docs": [
+        "Project owner transfers sale tokens into the vault PDA.",
+        "Must be called before investors can invest."
+      ],
+      "discriminator": [
+        176,
+        83,
+        229,
+        18,
+        191,
+        143,
+        176,
+        150
+      ],
       "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
-        { "name": "token_mint" },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "project"
+          ]
+        },
+        {
+          "name": "token_mint",
+          "relations": [
+            "project"
+          ]
+        },
         {
           "name": "project",
           "writable": true,
           "pda": {
             "seeds": [
-              { "kind": "const", "value": [112, 114, 111, 106, 101, 99, 116] },
-              { "kind": "account", "path": "token_mint" }
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
             ]
           }
         },
-        { "name": "owner_token_account", "writable": true },
+        {
+          "name": "owner_token_account",
+          "docs": [
+            "Owner's token account; must hold at least total_tokens_for_sale."
+          ],
+          "writable": true
+        },
         {
           "name": "vault",
+          "docs": [
+            "Vault token account PDA controlled by the project PDA."
+          ],
           "writable": true,
           "pda": {
             "seeds": [
-              { "kind": "const", "value": [118, 97, 117, 108, 116] },
-              { "kind": "account", "path": "project" }
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              }
             ]
           }
         },
-        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
-        { "name": "system_program", "address": "11111111111111111111111111111111" }
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
       ],
       "args": []
     },
     {
-      "name": "invest",
-      "discriminator": [13, 245, 180, 103, 254, 182, 121, 4],
+      "name": "initialize_market",
+      "docs": [
+        "Initialize a bonding curve market for an existing project.",
+        "Call once, after deposit_tokens, before any buy/sell."
+      ],
+      "discriminator": [
+        35,
+        35,
+        189,
+        193,
+        155,
+        48,
+        170,
+        203
+      ],
       "accounts": [
-        { "name": "investor", "writable": true, "signer": true },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "project"
+          ]
+        },
+        {
+          "name": "token_mint",
+          "relations": [
+            "project"
+          ]
+        },
         {
           "name": "project",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
           "writable": true,
           "pda": {
             "seeds": [
-              { "kind": "const", "value": [112, 114, 111, 106, 101, 99, 116] },
-              { "kind": "account", "path": "project.token_mint", "account": "Project" }
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "InitializeMarketParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "invest",
+      "docs": [
+        "Investor sends SOL; receives a token allocation recorded on-chain."
+      ],
+      "discriminator": [
+        13,
+        245,
+        180,
+        103,
+        254,
+        182,
+        121,
+        4
+      ],
+      "accounts": [
+        {
+          "name": "investor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "project",
+          "docs": [
+            "Project PDA also acts as treasury — invested SOL lands here."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project.token_mint",
+                "account": "Project"
+              }
             ]
           }
         },
@@ -124,38 +824,398 @@
           "writable": true,
           "pda": {
             "seeds": [
-              { "kind": "const", "value": [105, 110, 118, 101, 115, 116, 109, 101, 110, 116] },
-              { "kind": "account", "path": "project" },
-              { "kind": "account", "path": "investor" }
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  118,
+                  101,
+                  115,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              },
+              {
+                "kind": "account",
+                "path": "investor"
+              }
             ]
           }
         },
-        { "name": "system_program", "address": "11111111111111111111111111111111" }
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
       ],
-      "args": [{ "name": "amount_in_lamports", "type": "u64" }]
+      "args": [
+        {
+          "name": "amount_in_lamports",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "sell",
+      "docs": [
+        "Sell tokens back to the protocol at current bonding curve price.",
+        "min_payout: slippage guard — tx fails if payout falls below this."
+      ],
+      "discriminator": [
+        51,
+        230,
+        133,
+        164,
+        1,
+        127,
+        131,
+        173
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_mint",
+          "relations": [
+            "project"
+          ]
+        },
+        {
+          "name": "project",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              }
+            ]
+          }
+        },
+        {
+          "name": "seller_ata",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "token_amount",
+          "type": "u64"
+        },
+        {
+          "name": "min_payout",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "withdraw_funds",
-      "discriminator": [241, 36, 29, 111, 208, 31, 104, 217],
+      "docs": [
+        "Project owner withdraws SOL from the project PDA (treasury)."
+      ],
+      "discriminator": [
+        241,
+        36,
+        29,
+        111,
+        208,
+        31,
+        104,
+        217
+      ],
       "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "project"
+          ]
+        },
         {
           "name": "project",
           "writable": true,
           "pda": {
             "seeds": [
-              { "kind": "const", "value": [112, 114, 111, 106, 101, 99, 116] },
-              { "kind": "account", "path": "project.token_mint", "account": "Project" }
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  106,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project.token_mint",
+                "account": "Project"
+              }
             ]
           }
         }
       ],
-      "args": [{ "name": "amount", "type": "u64" }]
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
     }
   ],
   "accounts": [
-    { "name": "Investment", "discriminator": [175, 134, 9, 175, 115, 153, 39, 28] },
-    { "name": "Project", "discriminator": [205, 168, 189, 202, 181, 247, 142, 19] }
+    {
+      "name": "Investment",
+      "discriminator": [
+        175,
+        134,
+        9,
+        175,
+        115,
+        153,
+        39,
+        28
+      ]
+    },
+    {
+      "name": "Market",
+      "discriminator": [
+        219,
+        190,
+        213,
+        55,
+        0,
+        227,
+        198,
+        154
+      ]
+    },
+    {
+      "name": "Project",
+      "discriminator": [
+        205,
+        168,
+        189,
+        202,
+        181,
+        247,
+        142,
+        19
+      ]
+    },
+    {
+      "name": "Treasury",
+      "discriminator": [
+        238,
+        239,
+        123,
+        238,
+        89,
+        1,
+        168,
+        253
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ProjectNotActive",
+      "msg": "Project is not active"
+    },
+    {
+      "code": 6001,
+      "name": "InsufficientAmount",
+      "msg": "Investment amount too small to purchase any tokens"
+    },
+    {
+      "code": 6002,
+      "name": "TokensNotDeposited",
+      "msg": "Tokens not yet deposited into vault by project owner"
+    },
+    {
+      "code": 6003,
+      "name": "NoTokensAvailable",
+      "msg": "No tokens left for sale"
+    },
+    {
+      "code": 6004,
+      "name": "ExceedsTokenLimit",
+      "msg": "Investment would exceed remaining token supply"
+    },
+    {
+      "code": 6005,
+      "name": "NothingToClaim",
+      "msg": "Nothing to claim"
+    },
+    {
+      "code": 6006,
+      "name": "Unauthorized",
+      "msg": "Unauthorized: caller is not the project owner"
+    },
+    {
+      "code": 6007,
+      "name": "InsufficientTreasury",
+      "msg": "Requested withdrawal exceeds raised amount on record"
+    },
+    {
+      "code": 6008,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidTokenPrice",
+      "msg": "Token price must be greater than zero"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidTargetRaise",
+      "msg": "Target raise must be greater than zero"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidTokenSupply",
+      "msg": "Total tokens for sale must be greater than zero"
+    },
+    {
+      "code": 6012,
+      "name": "NameTooLong",
+      "msg": "Name exceeds 50 characters"
+    },
+    {
+      "code": 6013,
+      "name": "SymbolTooLong",
+      "msg": "Symbol exceeds 10 characters"
+    },
+    {
+      "code": 6014,
+      "name": "DescriptionTooLong",
+      "msg": "Description exceeds 200 characters"
+    },
+    {
+      "code": 6015,
+      "name": "TokensAlreadyDeposited",
+      "msg": "Tokens have already been deposited into the vault"
+    },
+    {
+      "code": 6016,
+      "name": "ZeroInvestment",
+      "msg": "Investment amount must be greater than zero"
+    },
+    {
+      "code": 6017,
+      "name": "InsufficientOwnerBalance",
+      "msg": "Owner token account has insufficient balance"
+    },
+    {
+      "code": 6018,
+      "name": "SlippageExceeded",
+      "msg": "Transaction price moved past slippage tolerance"
+    },
+    {
+      "code": 6019,
+      "name": "InsufficientSellerBalance",
+      "msg": "Seller token account has insufficient balance"
+    }
   ],
   "types": [
     {
@@ -163,72 +1223,315 @@
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "name", "type": "string" },
-          { "name": "symbol", "type": "string" },
-          { "name": "description", "type": "string" },
-          { "name": "target_raise", "type": "u64" },
-          { "name": "token_price", "type": "u64" },
-          { "name": "total_tokens_for_sale", "type": "u64" }
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "symbol",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "target_raise",
+            "docs": [
+              "Fundraising goal in lamports."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "token_price",
+            "docs": [
+              "Lamports per smallest token unit."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_tokens_for_sale",
+            "docs": [
+              "Raw token units offered for sale."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeMarketParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "base_price",
+            "docs": [
+              "Lamports per token when tokens_outstanding = 0."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "price_increment",
+            "docs": [
+              "Lamports added to price per token outstanding (curve slope)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "creator_fee_bps",
+            "docs": [
+              "Basis points of each buy sent to the project creator (0–10_000)."
+            ],
+            "type": "u16"
+          }
         ]
       }
     },
     {
       "name": "Investment",
+      "docs": [
+        "One Investment account per (project, investor) pair.",
+        "PDA seeds: [\"investment\", project, investor]",
+        "A second investment by the same wallet accumulates into this account."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "investor", "type": "pubkey" },
-          { "name": "project", "type": "pubkey" },
-          { "name": "amount_invested", "type": "u64" },
-          { "name": "tokens_allocated", "type": "u64" },
-          { "name": "tokens_claimed", "type": "u64" },
-          { "name": "timestamp", "type": "i64" },
-          { "name": "bump", "type": "u8" }
+          {
+            "name": "investor",
+            "type": "pubkey"
+          },
+          {
+            "name": "project",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_invested",
+            "docs": [
+              "Total lamports invested across all invest() calls."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "tokens_allocated",
+            "docs": [
+              "Total tokens allocated (cumulative)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "tokens_claimed",
+            "docs": [
+              "Tokens already claimed via claim_tokens()."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Timestamp of first investment."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Market",
+      "docs": [
+        "Bonding curve market for a token.",
+        "PDA seeds: [\"market\", token_mint]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_reserve",
+            "docs": [
+              "Tokens in vault available for purchase."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "sol_reserve",
+            "docs": [
+              "Lamports in treasury available for sell payouts."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "tokens_outstanding",
+            "docs": [
+              "Net tokens outstanding in trader wallets (buy: +n, sell: -n)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_supply",
+            "docs": [
+              "Total tokens this market was seeded with."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "base_price",
+            "docs": [
+              "Lamports per token when tokens_outstanding = 0."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "price_increment",
+            "docs": [
+              "Lamports added to price per token outstanding (curve slope)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "treasury_bump",
+            "docs": [
+              "Stored so buy/sell can validate treasury PDA without re-derivation."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "creator_fee_bps",
+            "docs": [
+              "Basis points of each buy sent to the project creator (100 = 1%)."
+            ],
+            "type": "u16"
+          }
         ]
       }
     },
     {
       "name": "Project",
+      "docs": [
+        "One Project account per token mint.",
+        "PDA seeds: [\"project\", token_mint]",
+        "Invested SOL lives in this account's lamports (above rent-exempt minimum).",
+        "raised_amount tracks the withdrawable balance; it decrements on withdrawal."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "owner", "type": "pubkey" },
-          { "name": "token_mint", "type": "pubkey" },
-          { "name": "name", "type": "string" },
-          { "name": "symbol", "type": "string" },
-          { "name": "description", "type": "string" },
-          { "name": "target_raise", "type": "u64" },
-          { "name": "raised_amount", "type": "u64" },
-          { "name": "token_price", "type": "u64" },
-          { "name": "total_tokens_for_sale", "type": "u64" },
-          { "name": "sold_tokens", "type": "u64" },
-          { "name": "created_at", "type": "i64" },
-          { "name": "is_active", "type": "bool" },
-          { "name": "tokens_deposited", "type": "bool" },
-          { "name": "bump", "type": "u8" },
-          { "name": "vault_bump", "type": "u8" }
+          {
+            "name": "owner",
+            "docs": [
+              "Original creator; only they may deposit tokens and withdraw SOL."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "docs": [
+              "The SPL mint this project sells."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "symbol",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "target_raise",
+            "docs": [
+              "Fundraising goal in lamports."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "raised_amount",
+            "docs": [
+              "Lamports currently raised (decremented on withdrawal)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "token_price",
+            "docs": [
+              "Lamports per smallest token unit (e.g., 1_000_000 lamports per token with 9 decimals)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_tokens_for_sale",
+            "docs": [
+              "Number of tokens (raw units) offered for sale."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "sold_tokens",
+            "docs": [
+              "Tokens already allocated to investors."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "tokens_deposited",
+            "docs": [
+              "True after owner calls deposit_tokens; investing requires this."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Canonical bump for this PDA (stored to avoid re-derivation in CPIs)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "docs": [
+              "Canonical bump for the vault token account PDA; set in deposit_tokens."
+            ],
+            "type": "u8"
+          }
         ]
       }
+    },
+    {
+      "name": "Treasury",
+      "docs": [
+        "Minimal program-owned SOL vault.",
+        "PDA seeds: [\"treasury\", token_mint]",
+        "Lamports above rent-exempt minimum = tradeable reserve."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
     }
-  ],
-  "errors": [
-    { "code": 6000, "name": "ProjectNotActive", "msg": "Project is not active" },
-    { "code": 6001, "name": "InsufficientAmount", "msg": "Investment amount too small to purchase any tokens" },
-    { "code": 6002, "name": "TokensNotDeposited", "msg": "Tokens not yet deposited into vault by project owner" },
-    { "code": 6003, "name": "NoTokensAvailable", "msg": "No tokens left for sale" },
-    { "code": 6004, "name": "ExceedsTokenLimit", "msg": "Investment would exceed remaining token supply" },
-    { "code": 6005, "name": "NothingToClaim", "msg": "Nothing to claim" },
-    { "code": 6006, "name": "Unauthorized", "msg": "Unauthorized: caller is not the project owner" },
-    { "code": 6007, "name": "InsufficientTreasury", "msg": "Requested withdrawal exceeds raised amount on record" },
-    { "code": 6008, "name": "Overflow", "msg": "Arithmetic overflow" },
-    { "code": 6009, "name": "InvalidTokenPrice", "msg": "Token price must be greater than zero" },
-    { "code": 6010, "name": "InvalidTargetRaise", "msg": "Target raise must be greater than zero" },
-    { "code": 6011, "name": "InvalidTokenSupply", "msg": "Total tokens for sale must be greater than zero" },
-    { "code": 6012, "name": "NameTooLong", "msg": "Name exceeds 50 characters" },
-    { "code": 6013, "name": "SymbolTooLong", "msg": "Symbol exceeds 10 characters" },
-    { "code": 6014, "name": "DescriptionTooLong", "msg": "Description exceeds 200 characters" },
-    { "code": 6015, "name": "TokensAlreadyDeposited", "msg": "Tokens have already been deposited into the vault" },
-    { "code": 6016, "name": "ZeroInvestment", "msg": "Investment amount must be greater than zero" },
-    { "code": 6017, "name": "InsufficientOwnerBalance", "msg": "Owner token account has insufficient balance" }
   ]
 }

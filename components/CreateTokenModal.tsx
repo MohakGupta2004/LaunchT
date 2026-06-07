@@ -1,11 +1,11 @@
 'use client'
 import { useState } from 'react'
 import { useConnection, useWallet } from '@solana/wallet-adapter-react'
-import { PublicKey } from '@solana/web3.js'
+import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js'
 import { getAssociatedTokenAddress } from '@solana/spl-token'
 import { toast } from 'sonner'
 import { createToken } from '@/utils/createToken'
-import { useCreateProject, useDepositTokens } from '@/hooks/useLaunchpad'
+import { useCreateProject, useDepositTokens, useInitializeMarket } from '@/hooks/useLaunchpad'
 import Modal from './Modal'
 
 type Step = 'token' | 'project' | 'done'
@@ -24,6 +24,7 @@ export default function CreateTokenModal({
   const wallet = useWallet()
   const { createProject, loading: cpLoading } = useCreateProject()
   const { depositTokens, loading: dtLoading } = useDepositTokens()
+  const { initializeMarket, loading: imLoading } = useInitializeMarket()
 
   const [step, setStep] = useState<Step>('token')
   const [mintAddress, setMintAddress] = useState('')
@@ -40,8 +41,12 @@ export default function CreateTokenModal({
   const [tokenPriceLamports, setTokenPriceLamports] = useState('')
   const [tokensForSale, setTokensForSale] = useState('')
   const [depositNow, setDepositNow] = useState(true)
+  const [openTradingNow, setOpenTradingNow] = useState(true)
+  const [basePriceSol, setBasePriceSol] = useState('0.001')
+  const [priceIncrementSol, setPriceIncrementSol] = useState('0.000001')
+  const [creatorFeeBps, setCreatorFeeBps] = useState('0')
 
-  const busy = tokenLoading || cpLoading || dtLoading
+  const busy = tokenLoading || cpLoading || dtLoading || imLoading
 
   const uploadImage = async (): Promise<string> => {
     if (!image) throw new Error('No image selected')
@@ -83,9 +88,20 @@ export default function CreateTokenModal({
     const targetSol = parseFloat(targetRaiseSol)
     const tokenPrice = parseInt(tokenPriceLamports)
     const forSale = parseInt(tokensForSale)
+    const baseLamports = Math.round(parseFloat(basePriceSol) * LAMPORTS_PER_SOL)
+    const incrementLamports = Math.round(parseFloat(priceIncrementSol) * LAMPORTS_PER_SOL)
+    const feeBps = parseInt(creatorFeeBps, 10)
 
     if (!description.trim() || !targetSol || !tokenPrice || !forSale) {
       toast.error('Fill in all fields')
+      return
+    }
+    if (openTradingNow && !depositNow) {
+      toast.error('Deposit tokens before opening trading')
+      return
+    }
+    if (openTradingNow && (!baseLamports || incrementLamports < 0 || Number.isNaN(feeBps))) {
+      toast.error('Fill in valid market parameters')
       return
     }
 
@@ -105,7 +121,17 @@ export default function CreateTokenModal({
       if (depositNow && wallet.publicKey) {
         const ownerAta = await getAssociatedTokenAddress(tokenMint, wallet.publicKey)
         await depositTokens(tokenMint, ownerAta)
-        toast.success('Tokens deposited into vault — project is now open for investment!')
+        toast.success('Tokens deposited into vault')
+      }
+
+      if (openTradingNow) {
+        await initializeMarket(
+          tokenMint,
+          baseLamports,
+          incrementLamports,
+          Math.min(10_000, Math.max(0, feeBps))
+        )
+        toast.success('Trading market opened')
       }
 
       setStep('done')
@@ -125,6 +151,11 @@ export default function CreateTokenModal({
     setTargetRaiseSol('')
     setTokenPriceLamports('')
     setTokensForSale('')
+    setDepositNow(true)
+    setOpenTradingNow(true)
+    setBasePriceSol('0.001')
+    setPriceIncrementSol('0.000001')
+    setCreatorFeeBps('0')
     onClose()
   }
 
@@ -144,19 +175,21 @@ export default function CreateTokenModal({
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. My Awesome Token"
+              placeholder="e.g. LaunchT Demo Token"
               className={inputCls}
             />
+            <p className="mt-1 text-xs text-zinc-600">This is the public name traders will see.</p>
           </div>
           <div>
             <label className="block text-sm text-zinc-400 mb-1.5">Symbol</label>
             <input
               value={symbol}
               onChange={(e) => setSymbol(e.target.value)}
-              placeholder="e.g. MAT"
+              placeholder="e.g. LDT"
               maxLength={10}
               className={inputCls}
             />
+            <p className="mt-1 text-xs text-zinc-600">Short ticker for the token card and trade modal.</p>
           </div>
           <div>
             <label className="block text-sm text-zinc-400 mb-1.5">Token Image</label>
@@ -171,7 +204,7 @@ export default function CreateTokenModal({
             )}
           </div>
           <p className="text-xs text-zinc-600 bg-zinc-900 rounded-lg p-3 border border-zinc-800">
-            Creates an SPL token with 9 decimals and mints 1,000,000 tokens to your wallet via Metaplex.
+            This creates an SPL token with 9 decimals and mints the supply to your wallet. After this step, you register it on the marketplace.
           </p>
           <div className="flex gap-3 pt-1">
             <button
@@ -206,7 +239,7 @@ export default function CreateTokenModal({
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What does your project do?"
+              placeholder="A short explanation of what this token is for."
               maxLength={200}
               rows={3}
               className={`${inputCls} resize-none`}
@@ -241,7 +274,7 @@ export default function CreateTokenModal({
             </div>
           </div>
           <p className="text-xs text-zinc-600 -mt-2 bg-zinc-900 border border-zinc-800 rounded-lg p-3">
-            Token price = lamports per raw unit. Example: 1,000,000 lam = 0.001 SOL per raw unit.
+            Target raise is the SOL goal shown on the card. Token price is the older fixed-price investment value in lamports, where 1,000,000 lamports = 0.001 SOL per raw unit.
             At 9 decimals, 1&nbsp;SOL would buy{' '}
             {tokenPriceLamports
               ? Math.floor(1_000_000_000 / parseInt(tokenPriceLamports)).toLocaleString()
@@ -262,7 +295,7 @@ export default function CreateTokenModal({
               className={inputCls}
             />
             <p className="text-xs text-zinc-600 mt-1">
-              Token has 9 decimals — 1 display token = 10⁹ raw units. Minted supply = 10¹⁵ raw units (1,000,000 tokens).
+              Raw units are the smallest on-chain token amount. With 9 decimals, 1 full display token = 1,000,000,000 raw units.
             </p>
           </div>
 
@@ -270,14 +303,75 @@ export default function CreateTokenModal({
             <input
               type="checkbox"
               checked={depositNow}
-              onChange={(e) => setDepositNow(e.target.checked)}
+              onChange={(e) => {
+                setDepositNow(e.target.checked)
+                if (!e.target.checked) setOpenTradingNow(false)
+              }}
               className="mt-0.5 rounded border-zinc-600 bg-zinc-800 accent-violet-600"
             />
             <span className="text-sm text-zinc-300 leading-relaxed">
               Deposit tokens into vault now{' '}
-              <span className="text-zinc-500">(required before investors can invest)</span>
+              <span className="text-zinc-500">(moves sale tokens into the program vault)</span>
             </span>
           </label>
+
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={openTradingNow}
+              disabled={!depositNow}
+              onChange={(e) => setOpenTradingNow(e.target.checked)}
+              className="mt-0.5 rounded border-zinc-600 bg-zinc-800 accent-violet-600 disabled:opacity-40"
+            />
+            <span className="text-sm text-zinc-300 leading-relaxed">
+              Open buy/sell trading now{' '}
+              <span className="text-zinc-500">(lets traders buy and sell from the curve)</span>
+            </span>
+          </label>
+
+          {openTradingNow && (
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">Base price (SOL)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={basePriceSol}
+                    onChange={(e) => setBasePriceSol(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">Increment (SOL)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={priceIncrementSol}
+                    onChange={(e) => setPriceIncrementSol(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">Fee (bps)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    max="10000"
+                    value={creatorFeeBps}
+                    onChange={(e) => setCreatorFeeBps(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-zinc-600">
+                Base price is the starting SOL price per raw unit. Increment is how much that price increases after each raw unit is bought. Creator fee is a percentage of each buy, in basis points: 100 bps = 1%.
+              </p>
+            </div>
+          )}
 
           <div className="flex gap-3 pt-1">
             <button
@@ -289,6 +383,8 @@ export default function CreateTokenModal({
                 ? 'Registering…'
                 : dtLoading
                 ? 'Depositing tokens…'
+                : imLoading
+                ? 'Opening market…'
                 : 'Register Project'}
             </button>
             <button
@@ -308,8 +404,10 @@ export default function CreateTokenModal({
           <h3 className="text-lg font-semibold text-white">Project is live!</h3>
           <p className="text-sm text-zinc-400 leading-relaxed">
             Your token project is now listed on the marketplace.
-            {depositNow
-              ? ' Investors can find it and start investing right away.'
+            {openTradingNow
+              ? ' Traders can buy and sell it from the Trade screen.'
+              : depositNow
+              ? ' Open trading from the trade modal when you are ready.'
               : " Remember to deposit tokens from the program owner's wallet before investors can invest."}
           </p>
           <div className="rounded-lg bg-zinc-900 border border-zinc-800 p-3 text-left">

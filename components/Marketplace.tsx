@@ -10,7 +10,7 @@ export default function Marketplace() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-white">Marketplace</h2>
-          <p className="text-sm text-zinc-500 mt-0.5">Discover and invest in active token projects</p>
+          <p className="text-sm text-zinc-500 mt-0.5">Discover and trade tokens on the bonding curve</p>
         </div>
         <button
           onClick={refetch}

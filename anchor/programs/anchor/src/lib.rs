@@ -26,6 +26,16 @@ pub struct CreateProjectParams {
     pub total_tokens_for_sale: u64,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct InitializeMarketParams {
+    /// Lamports per token when tokens_outstanding = 0.
+    pub base_price: u64,
+    /// Lamports added to price per token outstanding (curve slope).
+    pub price_increment: u64,
+    /// Basis points of each buy sent to the project creator (0–10_000).
+    pub creator_fee_bps: u16,
+}
+
 // ─── Account Contexts ─────────────────────────────────────────────────────────
 // ALL #[derive(Accounts)] structs must live at the crate root so that
 // Anchor's macro places __client_accounts_* at `crate::` where the generated
@@ -183,9 +193,159 @@ pub struct WithdrawFunds<'info> {
     pub project: Account<'info, Project>,
 }
 
+#[derive(Accounts)]
+pub struct InitializeMarket<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    pub token_mint: Account<'info, Mint>,
+
+    #[account(
+        seeds = [PROJECT_SEED, token_mint.key().as_ref()],
+        bump = project.bump,
+        has_one = owner @ LaunchpadError::Unauthorized,
+        has_one = token_mint @ LaunchpadError::NoTokensAvailable,
+        constraint = project.tokens_deposited @ LaunchpadError::TokensNotDeposited,
+    )]
+    pub project: Account<'info, Project>,
+
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + Market::INIT_SPACE,
+        seeds = [MARKET_SEED, token_mint.key().as_ref()],
+        bump,
+    )]
+    pub market: Account<'info, Market>,
+
+    #[account(
+        init,
+        payer = owner,
+        space = 8,
+        seeds = [TREASURY_SEED, token_mint.key().as_ref()],
+        bump,
+    )]
+    pub treasury: Account<'info, Treasury>,
+
+    #[account(
+        seeds = [VAULT_SEED, project.key().as_ref()],
+        bump = project.vault_bump,
+        token::mint = token_mint,
+        token::authority = project,
+    )]
+    pub vault: Account<'info, TokenAccount>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Buy<'info> {
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+
+    pub token_mint: Account<'info, Mint>,
+
+    #[account(
+        seeds = [PROJECT_SEED, token_mint.key().as_ref()],
+        bump = project.bump,
+        has_one = token_mint @ LaunchpadError::NoTokensAvailable,
+    )]
+    pub project: Account<'info, Project>,
+
+    /// CHECK: receives creator fee — key validated against project.owner
+    #[account(
+        mut,
+        constraint = creator.key() == project.owner @ LaunchpadError::Unauthorized,
+    )]
+    pub creator: UncheckedAccount<'info>,
+
+    #[account(
+        mut,
+        seeds = [MARKET_SEED, token_mint.key().as_ref()],
+        bump = market.bump,
+    )]
+    pub market: Account<'info, Market>,
+
+    /// CHECK: validated via seeds + bump stored in market
+    #[account(
+        mut,
+        seeds = [TREASURY_SEED, token_mint.key().as_ref()],
+        bump = market.treasury_bump,
+    )]
+    pub treasury: Account<'info, Treasury>,
+
+    #[account(
+        mut,
+        seeds = [VAULT_SEED, project.key().as_ref()],
+        bump = project.vault_bump,
+        token::mint = token_mint,
+        token::authority = project,
+    )]
+    pub vault: Account<'info, TokenAccount>,
+
+    #[account(
+        init_if_needed,
+        payer = buyer,
+        associated_token::mint = token_mint,
+        associated_token::authority = buyer,
+    )]
+    pub buyer_ata: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Sell<'info> {
+    #[account(mut)]
+    pub seller: Signer<'info>,
+
+    pub token_mint: Account<'info, Mint>,
+
+    #[account(
+        seeds = [PROJECT_SEED, token_mint.key().as_ref()],
+        bump = project.bump,
+        has_one = token_mint @ LaunchpadError::NoTokensAvailable,
+    )]
+    pub project: Account<'info, Project>,
+
+    #[account(
+        mut,
+        seeds = [MARKET_SEED, token_mint.key().as_ref()],
+        bump = market.bump,
+    )]
+    pub market: Account<'info, Market>,
+
+    #[account(
+        mut,
+        seeds = [TREASURY_SEED, token_mint.key().as_ref()],
+        bump = market.treasury_bump,
+    )]
+    pub treasury: Account<'info, Treasury>,
+
+    #[account(
+        mut,
+        seeds = [VAULT_SEED, project.key().as_ref()],
+        bump = project.vault_bump,
+        token::mint = token_mint,
+        token::authority = project,
+    )]
+    pub vault: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        token::mint = token_mint,
+        token::authority = seller,
+    )]
+    pub seller_ata: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+}
+
 // ─── Program ──────────────────────────────────────────────────────────────────
 
-declare_id!("DYRJEMtEpkyrd4cpvjbGzf9Pg4CJ89JTm6id14PVmnWu");
+declare_id!("GBNYMJGjXwNBhhjarQ3sMiurya1yvQfeZfki1n1jASva");
 
 #[program]
 pub mod launchpad {
@@ -218,5 +378,26 @@ pub mod launchpad {
     /// Project owner withdraws SOL from the project PDA (treasury).
     pub fn withdraw_funds(ctx: Context<WithdrawFunds>, amount: u64) -> Result<()> {
         instructions::withdraw_funds::handler(ctx, amount)
+    }
+
+    /// Initialize a bonding curve market for an existing project.
+    /// Call once, after deposit_tokens, before any buy/sell.
+    pub fn initialize_market(
+        ctx: Context<InitializeMarket>,
+        params: InitializeMarketParams,
+    ) -> Result<()> {
+        instructions::initialize_market::handler(ctx, params)
+    }
+
+    /// Buy tokens at current bonding curve price.
+    /// max_cost: slippage guard — tx fails if cost exceeds this.
+    pub fn buy(ctx: Context<Buy>, token_amount: u64, max_cost: u64) -> Result<()> {
+        instructions::buy::handler(ctx, token_amount, max_cost)
+    }
+
+    /// Sell tokens back to the protocol at current bonding curve price.
+    /// min_payout: slippage guard — tx fails if payout falls below this.
+    pub fn sell(ctx: Context<Sell>, token_amount: u64, min_payout: u64) -> Result<()> {
+        instructions::sell::handler(ctx, token_amount, min_payout)
     }
 }

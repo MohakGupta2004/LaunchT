@@ -14,6 +14,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { AnchorProvider, Program, BN } from "@anchor-lang/core";
+import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
+import { publicKey as umiPublicKey } from "@metaplex-foundation/umi";
+import { fetchDigitalAsset, mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
 import {
   PublicKey,
   SystemProgram,
@@ -35,6 +38,8 @@ const PROGRAM_ID = new PublicKey(IDL.address);
 const PROJECT_SEED = Buffer.from("project");
 const VAULT_SEED = Buffer.from("vault");
 const INVESTMENT_SEED = Buffer.from("investment");
+const MARKET_SEED = Buffer.from("market");
+const TREASURY_SEED = Buffer.from("treasury");
 
 export async function findProjectPda(tokenMint: PublicKey): Promise<PublicKey> {
   const [pda] = PublicKey.findProgramAddressSync(
@@ -61,6 +66,59 @@ export async function findInvestmentPda(
     PROGRAM_ID
   );
   return pda;
+}
+
+export function findMarketPda(tokenMint: PublicKey): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [MARKET_SEED, tokenMint.toBuffer()],
+    PROGRAM_ID
+  );
+  return pda;
+}
+
+export function findTreasuryPda(tokenMint: PublicKey): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [TREASURY_SEED, tokenMint.toBuffer()],
+    PROGRAM_ID
+  );
+  return pda;
+}
+
+// ─── Bonding curve math (mirrors on-chain compute_buy_cost / compute_sell_payout)
+
+/** ∫[s → s+n] (base + increment·x) dx = base·n + increment·n·(2s+n)/2 */
+export function computeBuyCost(
+  basePrice: BN,
+  priceIncrement: BN,
+  tokensOutstanding: BN,
+  n: BN
+): BN {
+  const linear = basePrice.mul(n);
+  const twoSPlusN = tokensOutstanding.muln(2).add(n);
+  const curve = priceIncrement.mul(n).mul(twoSPlusN).divn(2);
+  return linear.add(curve);
+}
+
+/** ∫[s-n → s] (base + increment·x) dx = base·n + increment·n·(2s-n)/2 */
+export function computeSellPayout(
+  basePrice: BN,
+  priceIncrement: BN,
+  tokensOutstanding: BN,
+  n: BN
+): BN {
+  const linear = basePrice.mul(n);
+  const twoSMinusN = tokensOutstanding.muln(2).sub(n);
+  const curve = priceIncrement.mul(n).mul(twoSMinusN).divn(2);
+  return linear.add(curve);
+}
+
+/** Spot price in lamports at current outstanding supply. */
+export function spotPriceLamports(
+  basePrice: BN,
+  priceIncrement: BN,
+  tokensOutstanding: BN
+): BN {
+  return basePrice.add(priceIncrement.mul(tokensOutstanding));
 }
 
 // ─── Provider helper ──────────────────────────────────────────────────────────
@@ -90,6 +148,8 @@ export type ProjectAccount = {
   publicKey: PublicKey;
   owner: PublicKey;
   tokenMint: PublicKey;
+  imageUrl?: string;
+  metadataUri?: string;
   name: string;
   symbol: string;
   description: string;
@@ -114,10 +174,31 @@ export type InvestmentAccount = {
   timestamp: BN;
 };
 
+async function fetchTokenMetadataImage(
+  rpcEndpoint: string,
+  tokenMint: PublicKey
+): Promise<{ imageUrl?: string; metadataUri?: string }> {
+  try {
+    const umi = createUmi(rpcEndpoint).use(mplTokenMetadata());
+    const asset = await fetchDigitalAsset(umi, umiPublicKey(tokenMint.toBase58()));
+    const metadataUri = asset.metadata.uri.replace(/\0/g, "").trim();
+    if (!metadataUri) return {};
+
+    const res = await fetch(metadataUri);
+    if (!res.ok) return { metadataUri };
+
+    const metadata = (await res.json()) as { image?: string };
+    return { metadataUri, imageUrl: metadata.image };
+  } catch {
+    return {};
+  }
+}
+
 // ─── useProjects ──────────────────────────────────────────────────────────────
 
 export function useProjects() {
   const program = useProgram();
+  const { connection } = useConnection();
   const [projects, setProjects] = useState<ProjectAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -155,13 +236,19 @@ export function useProjects() {
           progressPercent: progress,
         };
       });
-      setProjects(mapped);
+      const withImages = await Promise.all(
+        mapped.map(async (project) => ({
+          ...project,
+          ...(await fetchTokenMetadataImage(connection.rpcEndpoint, project.tokenMint)),
+        }))
+      );
+      setProjects(withImages);
     } catch (e) {
       setError(e as Error);
     } finally {
       setLoading(false);
     }
-  }, [program]);
+  }, [program, connection.rpcEndpoint]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -492,4 +579,313 @@ export function useWithdraw() {
   );
 
   return { withdraw, loading, error };
+}
+
+// ─── Market types ─────────────────────────────────────────────────────────────
+
+export type MarketAccount = {
+  publicKey: PublicKey;
+  tokenMint: PublicKey;
+  tokenReserve: BN;
+  solReserve: BN;
+  tokensOutstanding: BN;
+  totalSupply: BN;
+  basePrice: BN;
+  priceIncrement: BN;
+  /** Basis points of each buy sent to creator. */
+  creatorFeeBps: number;
+  /** Spot price in lamports for a single token at current supply. */
+  spotPriceLamports: BN;
+  /** Spot price in SOL. */
+  spotPriceSol: number;
+  /** Market cap = tokensOutstanding * spotPrice (in SOL). */
+  marketCapSol: number;
+  /** SOL in treasury (in SOL). */
+  treasurySol: number;
+};
+
+// ─── useMarkets (all) ────────────────────────────────────────────────────────
+
+export function useMarkets() {
+  const program = useProgram();
+  const [markets, setMarkets] = useState<MarketAccount[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!program) return;
+    setLoading(true);
+    setError(null);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = await (program.account as any).market.all();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mapped: MarketAccount[] = raw.map((m: any) => {
+        const acc = m.account as any;
+        const bp = acc.basePrice as BN;
+        const pi = acc.priceIncrement as BN;
+        const outstanding = acc.tokensOutstanding as BN;
+        const spot = spotPriceLamports(bp, pi, outstanding);
+        return {
+          publicKey: m.publicKey,
+          tokenMint: acc.tokenMint as PublicKey,
+          tokenReserve: acc.tokenReserve as BN,
+          solReserve: acc.solReserve as BN,
+          tokensOutstanding: outstanding,
+          totalSupply: acc.totalSupply as BN,
+          basePrice: bp,
+          priceIncrement: pi,
+          creatorFeeBps: acc.creatorFeeBps as number ?? 0,
+          spotPriceLamports: spot,
+          spotPriceSol: spot.toNumber() / LAMPORTS_PER_SOL,
+          marketCapSol:
+            outstanding.mul(spot).div(new BN(LAMPORTS_PER_SOL)).toNumber(),
+          treasurySol: (acc.solReserve as BN).toNumber() / LAMPORTS_PER_SOL,
+        };
+      });
+      setMarkets(mapped);
+    } catch (e) {
+      setError(e as Error);
+    } finally {
+      setLoading(false);
+    }
+  }, [program]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { markets, loading, error, refetch: fetch };
+}
+
+// ─── useMarket ────────────────────────────────────────────────────────────────
+
+export function useMarket(tokenMint: PublicKey | null) {
+  const program = useProgram();
+  const [market, setMarket] = useState<MarketAccount | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!program || !tokenMint) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const marketPda = findMarketPda(tokenMint);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const acc = await (program.account as any).market.fetch(marketPda) as any;
+      const bp = acc.basePrice as BN;
+      const pi = acc.priceIncrement as BN;
+      const outstanding = acc.tokensOutstanding as BN;
+      const spot = spotPriceLamports(bp, pi, outstanding);
+      setMarket({
+        publicKey: marketPda,
+        tokenMint: acc.tokenMint as PublicKey,
+        tokenReserve: acc.tokenReserve as BN,
+        solReserve: acc.solReserve as BN,
+        tokensOutstanding: outstanding,
+        totalSupply: acc.totalSupply as BN,
+        basePrice: bp,
+        priceIncrement: pi,
+        creatorFeeBps: acc.creatorFeeBps as number ?? 0,
+        spotPriceLamports: spot,
+        spotPriceSol: spot.toNumber() / LAMPORTS_PER_SOL,
+        marketCapSol:
+          outstanding.mul(spot).div(new BN(LAMPORTS_PER_SOL)).toNumber(),
+        treasurySol: (acc.solReserve as BN).toNumber() / LAMPORTS_PER_SOL,
+      });
+    } catch (e) {
+      setError(e as Error);
+    } finally {
+      setLoading(false);
+    }
+  }, [program, tokenMint?.toBase58()]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { market, loading, error, refetch: fetch };
+}
+
+// ─── useInitializeMarket ──────────────────────────────────────────────────────
+
+export function useInitializeMarket() {
+  const program = useProgram();
+  const { publicKey } = useWallet();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const initializeMarket = useCallback(
+    async (
+      tokenMint: PublicKey,
+      basePriceLamports: number,
+      priceIncrementLamports: number,
+      creatorFeeBps = 250,
+    ) => {
+      if (!program || !publicKey) throw new Error("Wallet not connected");
+      setLoading(true);
+      setError(null);
+      try {
+        const projectPda = await findProjectPda(tokenMint);
+        const vaultPda = await findVaultPda(projectPda);
+        const marketPda = findMarketPda(tokenMint);
+        const treasuryPda = findTreasuryPda(tokenMint);
+
+        const txSig = await program.methods
+          .initializeMarket({
+            basePrice: new BN(basePriceLamports),
+            priceIncrement: new BN(priceIncrementLamports),
+            creatorFeeBps,
+          })
+          .accounts({
+            owner: publicKey,
+            tokenMint,
+            project: projectPda,
+            market: marketPda,
+            treasury: treasuryPda,
+            vault: vaultPda,
+            systemProgram: SystemProgram.programId,
+          })
+          .rpc();
+
+        return { txSig, marketPda, treasuryPda };
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [program, publicKey]
+  );
+
+  return { initializeMarket, loading, error };
+}
+
+// ─── useBuy ───────────────────────────────────────────────────────────────────
+
+export function useBuy() {
+  const program = useProgram();
+  const { publicKey } = useWallet();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  /**
+   * Buy `tokenAmount` tokens.
+   * @param creator      Project owner pubkey — receives creator fee on-chain.
+   * @param slippageBps  Basis points of slippage tolerance (default 100 = 1%).
+   */
+  const buy = useCallback(
+    async (tokenMint: PublicKey, tokenAmount: BN, creator: PublicKey, slippageBps = 100) => {
+      if (!program || !publicKey) throw new Error("Wallet not connected");
+      setLoading(true);
+      setError(null);
+      try {
+        const projectPda = await findProjectPda(tokenMint);
+        const vaultPda = await findVaultPda(projectPda);
+        const marketPda = findMarketPda(tokenMint);
+        const treasuryPda = findTreasuryPda(tokenMint);
+        const buyerAta = await getAssociatedTokenAddress(tokenMint, publicKey);
+
+        // Fetch current market state for slippage calc.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mkt = await (program.account as any).market.fetch(marketPda) as any;
+        const cost = computeBuyCost(
+          mkt.basePrice as BN,
+          mkt.priceIncrement as BN,
+          mkt.tokensOutstanding as BN,
+          tokenAmount
+        );
+        // max_cost with slippage applied (round up to nearest lamport).
+        const maxCost = cost.muln(10_000 + slippageBps).divn(10_000).addn(1);
+
+        const txSig = await program.methods
+          .buy(tokenAmount, maxCost)
+          .accounts({
+            buyer: publicKey,
+            tokenMint,
+            project: projectPda,
+            creator,
+            market: marketPda,
+            treasury: treasuryPda,
+            vault: vaultPda,
+            buyerAta,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+            systemProgram: SystemProgram.programId,
+          })
+          .rpc();
+
+        return { txSig, cost, maxCost };
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [program, publicKey]
+  );
+
+  return { buy, loading, error };
+}
+
+// ─── useSell ──────────────────────────────────────────────────────────────────
+
+export function useSell() {
+  const program = useProgram();
+  const { publicKey } = useWallet();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  /**
+   * Sell `tokenAmount` tokens.
+   * @param slippageBps  Basis points of slippage tolerance (default 100 = 1%).
+   */
+  const sell = useCallback(
+    async (tokenMint: PublicKey, sellerAta: PublicKey, tokenAmount: BN, slippageBps = 100) => {
+      if (!program || !publicKey) throw new Error("Wallet not connected");
+      setLoading(true);
+      setError(null);
+      try {
+        const projectPda = await findProjectPda(tokenMint);
+        const vaultPda = await findVaultPda(projectPda);
+        const marketPda = findMarketPda(tokenMint);
+        const treasuryPda = findTreasuryPda(tokenMint);
+
+        // Fetch current market state for slippage calc.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mkt = await (program.account as any).market.fetch(marketPda) as any;
+        const payout = computeSellPayout(
+          mkt.basePrice as BN,
+          mkt.priceIncrement as BN,
+          mkt.tokensOutstanding as BN,
+          tokenAmount
+        );
+        // min_payout after slippage (round down).
+        const minPayout = payout.muln(10_000 - slippageBps).divn(10_000);
+
+        const txSig = await program.methods
+          .sell(tokenAmount, minPayout)
+          .accounts({
+            seller: publicKey,
+            tokenMint,
+            project: projectPda,
+            market: marketPda,
+            treasury: treasuryPda,
+            vault: vaultPda,
+            sellerAta,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          })
+          .rpc();
+
+        return { txSig, payout, minPayout };
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [program, publicKey]
+  );
+
+  return { sell, loading, error };
 }

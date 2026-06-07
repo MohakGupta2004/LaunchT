@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { LAMPORTS_PER_SOL } from '@solana/web3.js'
 import type { BN } from '@anchor-lang/core'
 import type { ProjectAccount } from '@/hooks/useLaunchpad'
-import InvestModal from './InvestModal'
+import TradeModal from './TradeModal'
 
 function solFmt(bn: BN) {
   return (bn.toNumber() / LAMPORTS_PER_SOL).toFixed(2)
@@ -16,17 +16,36 @@ export default function ProjectCard({
   project: ProjectAccount
   onInvested?: () => void
 }) {
-  const [showInvest, setShowInvest] = useState(false)
+  const [showTrade, setShowTrade] = useState(false)
+  const [tradeTab, setTradeTab] = useState<'buy' | 'sell'>('buy')
+  const [imageFailed, setImageFailed] = useState(false)
+  const showImage = project.imageUrl && !imageFailed
 
   return (
     <>
       <div className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-900 p-5 gap-3 hover:border-zinc-700 transition-colors">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="font-semibold text-white text-base truncate">{project.name}</h3>
-            <span className="text-xs font-mono text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded mt-1 inline-block">
-              {project.symbol}
-            </span>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
+              {showImage ? (
+                <img
+                  src={project.imageUrl}
+                  alt={`${project.name} token`}
+                  className="h-full w-full object-cover"
+                  onError={() => setImageFailed(true)}
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-zinc-800 text-sm font-semibold text-zinc-400">
+                  {project.symbol.slice(0, 3).toUpperCase()}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold text-white text-base truncate">{project.name}</h3>
+              <span className="text-xs font-mono text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded mt-1 inline-block">
+                {project.symbol}
+              </span>
+            </div>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
             <span
@@ -73,22 +92,32 @@ export default function ProjectCard({
               {project.tokenPrice.toNumber().toLocaleString()} lam
             </p>
           </div>
-          <button
-            onClick={() => setShowInvest(true)}
-            disabled={!project.isActive || !project.tokensDeposited}
-            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 active:bg-violet-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            Invest
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setTradeTab('buy'); setShowTrade(true) }}
+              disabled={!project.isActive || !project.tokensDeposited}
+              className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 active:bg-emerald-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Buy
+            </button>
+            <button
+              onClick={() => { setTradeTab('sell'); setShowTrade(true) }}
+              disabled={!project.isActive || !project.tokensDeposited}
+              className="rounded-lg bg-rose-700/80 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 active:bg-rose-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Sell
+            </button>
+          </div>
         </div>
       </div>
 
-      <InvestModal
+      <TradeModal
         project={project}
-        isOpen={showInvest}
-        onClose={() => setShowInvest(false)}
+        initialTab={tradeTab}
+        isOpen={showTrade}
+        onClose={() => setShowTrade(false)}
         onSuccess={() => {
-          setShowInvest(false)
+          setShowTrade(false)
           onInvested?.()
         }}
       />
