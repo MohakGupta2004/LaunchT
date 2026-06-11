@@ -1,14 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { LAMPORTS_PER_SOL } from '@solana/web3.js'
-import type { BN } from '@anchor-lang/core'
 import type { ProjectAccount, MarketAccount } from '@/hooks/useLaunchpad'
 import TradeModal from './TradeModal'
 import TokenAnalyticsModal from './TokenAnalyticsModal'
-
-function solFmt(bn: BN) {
-  return (bn.toNumber() / LAMPORTS_PER_SOL).toFixed(2)
-}
 
 export default function ProjectCard({
   project,
@@ -24,6 +18,13 @@ export default function ProjectCard({
   const [showAnalytics, setShowAnalytics] = useState(false)
   const [imageFailed, setImageFailed] = useState(false)
   const showImage = project.imageUrl && !imageFailed
+
+  const totalSupply = market ? market.totalSupply : project.totalTokensForSale
+  const sold = market ? market.tokensOutstanding : project.soldTokens
+  const left = market ? market.tokenReserve : project.totalTokensForSale.sub(project.soldTokens)
+  const soldPercent = totalSupply.isZero()
+    ? 0
+    : Math.min(100, sold.muln(100).div(totalSupply).toNumber())
 
   return (
     <>
@@ -77,16 +78,16 @@ export default function ProjectCard({
 
         <div>
           <div className="flex justify-between text-xs text-zinc-500 mb-1.5">
-            <span>{solFmt(project.raisedAmount)} SOL raised</span>
-            <span>Goal: {solFmt(project.targetRaise)} SOL</span>
+            <span>{sold.toNumber().toLocaleString()} units bought</span>
+            <span>{left.toNumber().toLocaleString()} units left</span>
           </div>
           <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
             <div
               className="h-full rounded-full bg-violet-600 transition-all duration-500"
-              style={{ width: `${project.progressPercent}%` }}
+              style={{ width: `${soldPercent}%` }}
             />
           </div>
-          <p className="mt-1 text-xs text-zinc-600">{project.progressPercent}% funded</p>
+          <p className="mt-1 text-xs text-zinc-600">{soldPercent}% sold</p>
         </div>
 
         <div className="flex items-center justify-between mt-auto pt-3 border-t border-zinc-800">
